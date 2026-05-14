@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>aldr V28.69</title>
+    <style>
+        :root { 
+            --bg: #1a1a1a; --past-bg: #2d2d2d; --panel: #111; --text: #ddd; --accent: #ffffff; --dim: #666; --border: #333; --save: #44aa44; --danger: #ff4444; 
+            --today-text: #ffff00; --note-marker: #ff8c00; --percent-color: #00ffff; --count-color: #00aaff; --gold: #ffd700;
+            --header-h: 45px;
+        }
+        body { font-family: monospace; background: var(--bg); color: var(--text); padding: 0; margin: 0; line-height: 1.2; overflow: hidden; display: flex; flex-direction: column; height: 100vh; transition: background 0.3s ease; }
+        body.is-past { background: var(--past-bg); }
+
+        .btn-h { height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 0 5px; font-size: 10px; cursor: pointer; border: 1px solid var(--dim); background: var(--border); color: var(--text); min-width: 30px; flex-shrink: 0; }
+        .top-utility-bar { position: fixed; top: 0; width: 100%; z-index: 1001; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 10px; height: 45px; box-sizing: border-box; }
+        .top-group { display: flex; align-items: center; gap: 4px; }
+
+        .path-bar { position: fixed; top: 45px; width: 100%; z-index: 999; background: var(--panel); border-bottom: 1px solid var(--border); padding: 0 8px; font-size: 12px; display: flex; align-items: center; justify-content: flex-start; height: 28px; box-sizing: border-box; gap: 6px; }
+        .path-sep { color: var(--dim); font-weight: normal; }
+        .path-crumb { font-weight: bold; cursor: pointer; }
+
+        #app { padding: 10px 2px 60px 2px; overflow-y: auto; flex-grow: 1; scroll-behavior: smooth; padding-top: 73px; }
+        .node { margin-left: 12px; padding: 2px 0; border-left: 1px solid var(--border); position: relative; scroll-margin-top: 73px; font-size: 12px; }
+        .active-node > .node-content { background: rgba(255, 255, 255, 0.12); border-left: 2px solid var(--accent) !important; outline: 1px solid rgba(255,255,255,0.1); }
+        
+        .address-input { width: auto; min-width: 25px; max-width: 45px; background: transparent; border: none; color: var(--dim); font-size: 10px; text-align: center; }
+        .quantity-input { width: 40px; background: var(--panel); border: 1px solid var(--border); color: var(--percent-color); font-size: 10px; text-align: center; font-family: monospace; }
+
+        .note-box { width: 90%; margin: 4px 0 4px 25px; background: #000; color: var(--note-marker); border: 1px solid var(--border); font-family: monospace; font-size: 10px; padding: 4px; outline: none; display: block; }
+        .note-ind { color: var(--dim); margin-left: 4px; font-size: 10px; }
+
+        #cal-panel { padding: 8px 12px !important; background: rgba(0,0,0,0.98) !important; display: none; border-bottom: 1px solid var(--border); }
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 44px); grid-template-rows: repeat(6, 40px); gap: 1px; border: 1px solid #444; background: #444; margin: 0 auto; }
+        .cal-day { position: relative; text-align: center; font-size: 10px; cursor: pointer; background: #000; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 4px; color: #fff; box-sizing: border-box; }
+        .cal-out-month { color: transparent !important; cursor: default; pointer-events: none; background: #000 !important; }
+        .cal-past-tint { background: var(--past-bg) !important; }
+        .cal-today-tint { background: var(--bg) !important; border: 1px solid var(--today-text) !important; }
+        .cal-today-tint .cal-day-num { color: var(--today-text) !important; }
+        .cal-future-active { color: var(--dim) !important; }
+        .cal-day.selected-day { outline: 1.5px solid #fff !important; outline-offset: -1.5px; z-index: 2; border: none !important; }
+
+        .header-container { z-index: 1000; background: transparent; border-top: 1px solid var(--border); flex-shrink: 0; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; padding: 0 8px; background: var(--panel); height: 48px; gap: 4px; box-sizing: border-box; }
+        
+        .brand-tag-col { display: flex; flex-direction: column; justify-content: center; min-width: 60px; line-height: 1; flex-shrink: 0; }
+        .brand-name, .ver-string { font-size: 12px; font-weight: bold; color: var(--dim); white-space: nowrap; }
+
+        .filter-group { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+
+        #nav-panel { display: none; background: var(--panel); border-bottom: 1px solid var(--border); padding: 6px 0; }
+        .nav-jump-btn { padding: 0 10px; border: 1px solid var(--border); background: var(--bg); font-size: 12px; white-space: nowrap; height: 26px; font-family: monospace; color: var(--text); cursor: pointer; display: flex; align-items: center; }
+        
+        .toggle-active { outline: 1px solid var(--accent) !important; border-color: var(--accent) !important; }
+        .btn-greyed { opacity: 0.2; pointer-events: none; }
+        .exp-trigger { font-size: 10px; opacity: 0.5; margin-left: 4px; cursor: pointer; padding: 2px 4px; }
+        .hidden { display: none; }
+        .node-check { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1px solid var(--border); background: #fff; cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center; margin: 0; }
+        .node-check:checked { background: var(--count-color) !important; border-color: var(--count-color); }
+        .node-check:checked::after { content: '✓'; color: #fff; font-size: 10px; font-weight: bold; }
+    </style>
+</head>
+<body onload="init()">
+    <div class="top-utility-bar">
+        <div class="top-group">
+            <button onclick="smartAddNode()" class="btn-h" style="font-size:20px;">+</button>
+            <button onclick="handleQuantityAdd()" class="btn-h" style="font-size:14px;">#</button>
+            <div style="width:12px;"></div>
+            <button onclick="toggleRecursiveExpansion()" class="btn-h" style="font-size:18px;">×</button>
+        </div>
+        <div class="top-group">
+            <button onclick="navBack()" class="btn-h" style="font-size:18px;"><b>&lt;</b></button>
+            <button onclick="navForward()" class="btn-h" style="font-size:18px;"><b>&gt;</b></button>
+        </div>
+        <div class="top-group">
+            <button onclick="handleDelete()" class="btn-h" style="color:var(--danger)">DEL</button>
+            <button onclick="undo()" class="btn-h">UND</button>
+            <button onclick="redo()" class="btn-h">RED</button>
+            <div style="width:12px;"></div>
+            <button onclick="toggleInactive()" class="btn-h" style="font-size:18px;">∅</button>
+            <button onclick="toggleNoteEditor()" class="btn-h" style="font-size:20px; font-weight:bold;">*</button>
+        </div>
+    </div>
+
+    <div id="path-bar" class="path-bar"></div>
+    <div id="app"></div>
+
+    <div class="header-container">
+        <div id="nav-panel"><div id="nav-slider" style="display:flex; gap:4px; overflow-x:auto; padding:0 8px;"></div></div>
+        <div id="cal-panel">
+            <div style="display:flex; justify-content: center; gap: 12px; max-width: 100%;">
+                <div id="cal-grid" class="cal-grid"></div>
+                <div class="cal-ctrl-col" style="display:flex; flex-direction:column; gap:4px; align-items:center; min-width: 75px;">
+                    <div style="display:flex; gap:4px;"><button onclick="adjustMonth(-1)" class="btn-h" style="width:34px;">▲</button><button onclick="adjustMonth(1)" class="btn-h" style="width:34px;">▼</button></div>
+                    <div style="font-size:10px; color:var(--dim);"><input type="number" id="cal-m" style="width:24px;background:#000;color:#fff;border:1px solid var(--border);text-align:center;" onchange="renderCalendar()"> / <input type="number" id="cal-y" style="width:40px;background:#000;color:#fff;border:1px solid var(--border);text-align:center;" onchange="renderCalendar()"></div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px; margin-top:6px;">
+                        <button class="btn-h" onclick="setCalMode('percent')" id="m-perc" style="width:34px;">%</button>
+                        <button class="btn-h" onclick="setCalMode('sum')" id="m-sum" style="width:34px;">Σ</button>
+                        <button class="btn-h" onclick="setCalMode('checkmark')" id="m-check" style="width:34px;">✓</button>
+                        <button class="btn-h" onclick="setCalMode('time')" id="m-time" style="width:34px;">⧖</button>
+                    </div>
+                    <div style="margin-top:8px; border-top:1px solid var(--border); padding-top:6px; width: 100%; display: flex; justify-content: center;"><button class="btn-h btn-greyed" id="m-qty" onclick="setCalMode('quantity')" style="width:40px; font-size:14px;">#</button></div>
+                </div>
+            </div>
+        </div>
+        <div class="header-row">
+            <div class="brand-tag-col">
+                <span class="brand-name">aldr</span>
+                <span class="ver-string">v28.69</span>
+            </div>
+            
+            <div class="filter-group">
+                <button id="filter-sleep-btn" class="btn-h" onclick="toggleFilter('hideSlept')" style="font-size:16px;">Ƶ</button>
+                <button id="filter-active-btn" class="btn-h" onclick="toggleFilter('showActive')" style="font-size:16px;">☑</button>
+                <button id="nav-btn" class="btn-h" style="font-weight:bold; min-width:35px;" onclick="toggleStandalonePanel('nav-panel')">NAV</button>
+            </div>
+            
+            <div id="date-btn" class="btn-h" style="flex-grow: 1; font-weight: bold; font-size: 9px; line-height: 1.1; border: 1px solid var(--border);" onclick="toggleStandalonePanel('cal-panel')">
+                <span id="date-btn-text"></span>
+            </div>
+            
+            <button class="btn-h" id="auto-btn" style="background: var(--save); border: none; min-width:60px;">
+                <div style="color:#fff; font-weight:bold; font-size:11px;">AUTO</div>
+            </button>
+            
+            <button onclick="alert('aldr Manual')" class="btn-h" style="width:30px; font-weight:bold; font-size:16px;">?</button>
+        </div>
+    </div>
+
+<script>
+    let ledger = JSON.parse(localStorage.getItem('habitLedger')) || {};
+    let currentDate = new Date().toISOString().split('T')[0];
+    const systemToday = new Date().toISOString().split('T')[0];
+    let workingData = [], activeParentId = null, focusId = null, editingId = null, calMode = 'percent';
+    let undoStack = [], redoStack = [];
+    let hideSlept = false, showActiveOnly = false;
+
+    function init() { 
+        const d = new Date(currentDate);
+        document.getElementById('cal-m').value = d.getMonth() + 1;
+        document.getElementById('cal-y').value = d.getFullYear();
+        loadWorkingState(); 
+        setCalMode('percent');
+    }
+
+    // Logic Functions
+    function toggleNoteEditor() { if (!activeParentId) return; const node = workingData.find(n => n.id === activeParentId); if (node) { node.noteVisible = !node.noteVisible; render(); } }
+    function updateNoteText(id, text) { const node = workingData.find(n => n.id === id); if (node) { node.notes = text; autoSave(); } }
+    function toggleNodeExp(id) { const n = workingData.find(x => x.id === id); if (n) { n.expanded = !n.expanded; render(); autoSave(); } }
+    function toggleRecursiveExpansion() { recordState(); const parents = workingData.filter(n => workingData.some(c => c.parent === n.id)); const anyExp = parents.some(p => p.expanded); parents.forEach(p => p.expanded = !anyExp); render(); autoSave(); }
+    
+    function buildNodeHTML(node) {
+        const children = workingData.filter(h => h.parent === node.id);
+        const isA = activeParentId === node.id ? 'active-node' : '';
+        const styleText = node.inactive ? 'opacity:0.4; font-style:italic;' : '';
+        const noteMarker = (node.notes && node.notes.trim() !== '') ? `<span class="note-ind">*</span>` : '';
+        let checkStyle = "";
+        if (!node.inactive && !node.isQuantity && node.value > 0 && node.value < 1) {
+            const steps = Math.round(node.value * 8);
+            checkStyle = `background: linear-gradient(to top, var(--count-color) ${(steps/8)*100}%, #fff ${(steps/8)*100}%);`;
+        }
+        const descriptor = editingId === node.id ? `<input type="text" id="edit-${node.id}" value="${node.name}" onblur="finalizeEdit('${node.id}', this.value)" onkeydown="if(event.key==='Enter') this.blur()" autofocus style="background:var(--bg);color:var(--text);border:1px solid var(--percent-color);width:120px;" onclick="event.stopPropagation()">` : `<span onclick="handleDescriptorClick(event, '${node.id}')">${node.name}</span>`;
+        return `<div class="node ${isA}" id="dom-${node.id}">
+            <div class="node-content" style="display:flex; align-items:center; justify-content:space-between; padding-right:5px;" onclick="handleNodeClick('${node.id}')">
+                <span style="display:flex; align-items:center;">
+                    <input type="text" class="address-input" value="${getAddress(node.id)}" onchange="relocate('${node.id}', this.value)" onclick="event.stopPropagation()">
+                    <span style="color:${node.isQuantity ? 'var(--percent-color)' : 'var(--accent)'}; ${styleText}">• ${descriptor}${noteMarker} 
+                        <span class="exp-trigger" onclick="event.stopPropagation(); toggleNodeExp('${node.id}')">${children.length ? (node.expanded ? '[-]' : '[+]') : ''}</span>
+                    </span>
+                </span>
+                <span style="display:flex; align-items:center; gap:8px;">
+                    ${node.isQuantity ? `<input type="number" class="quantity-input" value="${node.quantity || 0}" onchange="updateQuantity('${node.id}', this.value)" onclick="event.stopPropagation()">` : 
+                        `<span style="font-size:9px; color:var(--gold); font-weight:bold;">${getRecursiveMetric(node.id, calMode)}</span>
+                         <input type="checkbox" class="node-check ${node.inactive ? 'slept-check' : ''}" style="${checkStyle}" ${node.value >= 1 ? 'checked' : ''} onchange="toggleCheck('${node.id}', this.checked)" onclick="event.stopPropagation()">`}
+                </span>
+            </div>
+            ${node.noteVisible ? `<textarea class="note-box" oninput="updateNoteText('${node.id}', this.value)" placeholder="Daily notes...">${node.notes || ''}</textarea>` : ''}
+            <div class="${(children.length && node.expanded) ? '' : 'hidden'}">${buildHTML(node.id)}</div>
+        </div>`;
+    }
+
+    function buildHTML(pId) { return workingData.filter(h => h.parent === pId).map(node => (hideSlept && node.inactive) || (showActiveOnly && !node.isQuantity && node.value <= 0) ? "" : buildNodeHTML(node)).join(''); }
+    function render() { document.getElementById('app').innerHTML = buildHTML(focusId); const d = new Date(currentDate + "T12:00:00"); document.getElementById('date-btn-text').innerHTML = `${d.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()}<br>${currentDate}`; const isToday = currentDate === systemToday; document.getElementById('date-btn').style.color = isToday ? 'var(--today-text)' : '#fff'; document.getElementById('date-btn').style.background = isToday ? '#000' : 'var(--past-bg)'; document.body.classList.toggle('is-past', !isToday); renderPath(); renderNavSlider(); if(document.getElementById('cal-panel').style.display === 'block') renderCalendar(); }
+    function renderPath() { const bar = document.getElementById('path-bar'); let html = `<span class="path-sep">> </span><span class="path-crumb" onclick="focusId=null;render();">ROOT</span>`; if (focusId) { let chain = []; let curr = workingData.find(n => n.id === focusId); while (curr) { chain.unshift(curr); curr = workingData.find(n => n.id === curr.parent); } chain.forEach(node => { html += ` <span class="path-sep">> </span><span class="path-crumb" onclick="focusId='${node.id}';render();">${node.name}</span>`; }); } bar.innerHTML = html; }
+    function renderNavSlider() { const container = document.getElementById('nav-slider'); if (!container) return; const children = workingData.filter(n => n.parent === focusId); container.innerHTML = children.map(c => `<div class="nav-jump-btn ${activeParentId === c.id ? 'toggle-active' : ''}" onclick="navJump('${c.id}')">${c.name}</div>`).join(''); }
+    function handleNodeClick(id) { activeParentId = (activeParentId === id) ? null : id; const node = workingData.find(n => n.id === id); const qBtn = document.getElementById('m-qty'); const mBtns = ['m-perc', 'm-sum', 'm-check', 'm-time']; if (node?.isQuantity) { calMode = 'quantity'; qBtn.classList.remove('btn-greyed'); mBtns.forEach(bId => document.getElementById(bId).classList.add('btn-greyed')); } else { if (calMode === 'quantity') calMode = 'percent'; qBtn.classList.add('btn-greyed'); mBtns.forEach(bId => document.getElementById(bId).classList.remove('btn-greyed')); } setCalMode(calMode); render(); }
+    function setCalMode(m) { calMode = m; ['m-perc', 'm-sum', 'm-check', 'm-time', 'm-qty'].forEach(id => document.getElementById(id)?.classList.remove('toggle-active')); const map = {percent:'m-perc', sum:'m-sum', checkmark:'m-check', time:'m-time', quantity:'m-qty'}; if (map[m]) document.getElementById(map[m]).classList.add('toggle-active'); renderCalendar(); }
+    function getAddress(nId) { const node = workingData.find(n => n.id === nId); if (!node) return ""; const siblings = workingData.filter(n => n.parent === node.parent && n.isQuantity === node.isQuantity); const idx = siblings.indexOf(node) + 1; return node.isQuantity ? String.fromCharCode(64 + idx) : (node.parent === null ? idx.toString() : getAddress(node.parent) + "." + idx); }
+    function relocate(nId, newAddr) { recordState(); const node = workingData.find(n => n.id === nId); if (!node) return; let newIdx = node.isQuantity ? newAddr.toUpperCase().charCodeAt(0) - 65 : parseInt(newAddr.split('.').pop()) - 1; if (isNaN(newIdx) || newIdx < 0) return; const sibs = workingData.filter(n => n.id !== nId && n.parent === node.parent && n.isQuantity === node.isQuantity); sibs.splice(newIdx, 0, node); const others = workingData.filter(n => n.parent !== node.parent || n.isQuantity !== node.isQuantity); workingData = [...others, ...sibs]; calculateProgress(); }
+    function loadWorkingState() { const key = `${currentDate}_SINGLE_TREE`; if (ledger[key]) { workingData = JSON.parse(JSON.stringify(ledger[key])); } else { const sorted = Object.keys(ledger).sort(); const lastDate = sorted.filter(k => k < currentDate + "_SINGLE_TREE").pop(); workingData = lastDate ? JSON.parse(JSON.stringify(ledger[lastDate])).map(n => ({ ...n, value: 0, quantity: n.isQuantity?0:(n.quantity||0), expanded: (n.parent===null), notes: "", noteVisible: false, completionTime: null })) : [{ id: "root-1", parent: null, name: "START", value: 0, expanded: true, inactive: false, notes: "", noteVisible: false, completionTime: null }]; } calculateProgress(); }
+    function switchDate(ds) { if (ds > systemToday) return; const tName = workingData.find(n => n.id === activeParentId)?.name; currentDate = ds; loadWorkingState(); if (tName) { const match = workingData.find(n => n.name === tName); if (match) { activeParentId = match.id; let curr = workingData.find(x => x.id === match.parent); while (curr) { curr.expanded = true; curr = workingData.find(x => x.id === curr.parent); } render(); setTimeout(() => document.getElementById(`dom-${match.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); return; } } render(); }
+    function getRecursiveMetric(nodeId, mode, dataSet = workingData) { const node = dataSet.find(n => n.id === nodeId); if (!node) return "--"; const getBranch = (id) => { let res = [dataSet.find(x=>x.id===id)]; dataSet.filter(x=>x.parent===id).forEach(c => res = res.concat(getBranch(c.id))); return res; }; const branch = getBranch(nodeId); const active = branch.filter(x => !x.inactive); switch(mode) { case 'sum': return node.inactive ? "--" : `${branch.filter(x=>x.inactive).length}/${branch.length}`; case 'checkmark': return node.inactive ? "--" : `${active.filter(x=>!x.isQuantity && x.value>=1).length}/${active.length}`; case 'time': return node.completionTime ? new Date(node.completionTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12:false}) : "--"; case 'quantity': return node.isQuantity ? node.quantity || 0 : "--"; default: return node.inactive ? "--" : (node.value * 100).toFixed(0) + "%"; } }
+    function renderCalendar() { const grid = document.getElementById('cal-grid'); if (!grid) return; grid.innerHTML = ''; const m = parseInt(document.getElementById('cal-m').value), y = parseInt(document.getElementById('cal-y').value); const firstDay = new Date(y, m-1, 1).getDay(); const daysInMonth = new Date(y, m, 0).getDate(); const selNode = workingData.find(n => n.id === activeParentId); for(let i=0; i<42; i++) { let dayNum, isOut = false; if (i < firstDay || i >= (firstDay + daysInMonth)) { isOut = true; dayNum = ''; } else { dayNum = i - firstDay + 1; } const activeDs = `${y}-${String(m).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`; const isToday = activeDs === systemToday && !isOut, isPast = activeDs < systemToday && !isOut, isFuture = activeDs > systemToday && !isOut, isSelected = activeDs === currentDate && !isOut; let sub = ""; if (!isOut) { try { const dKey = `${activeDs}_SINGLE_TREE`; if (ledger[dKey] && selNode) { const node = ledger[dKey].find(n => n.name === selNode.name); if (node) { const val = getRecursiveMetric(node.id, calMode, ledger[dKey]); if (val !== "" && val !== "--") sub = `<div style="font-size:8px; color:var(--percent-color);">${val}</div>`; } } } catch(e) {} } let classes = `cal-day ${isOut?'cal-out-month':''} ${isSelected?'selected-day':''} `; if (isToday) classes += 'cal-today-tint'; else if (isPast) classes += 'cal-past-tint'; else if (isFuture) classes += 'cal-future-active'; grid.innerHTML += `<div class="${classes}" ${isOut?'':`onclick="switchDate('${activeDs}')"`}><span class="cal-day-num" style="position:absolute;top:4px;width:100%;text-align:center;font-weight:bold;font-size:9px;">${dayNum}</span>${sub}</div>`; } }
+    function recordState() { undoStack.push(JSON.stringify(workingData)); }
+    function undo() { if (undoStack.length) { redoStack.push(JSON.stringify(workingData)); workingData = JSON.parse(undoStack.pop()); calculateProgress(); } }
+    function redo() { if (redoStack.length) { undoStack.push(JSON.stringify(workingData)); workingData = JSON.parse(redoStack.pop()); calculateProgress(); } }
+    function adjustMonth(v) { let m = parseInt(document.getElementById('cal-m').value)+v; let y = parseInt(document.getElementById('cal-y').value); if(m>12){m=1;y++}else if(m<1){m=12;y--} document.getElementById('cal-m').value=m; document.getElementById('cal-y').value=y; renderCalendar(); }
+    function handleDelete() { if(!activeParentId) return; recordState(); workingData = workingData.filter(n => n.id !== activeParentId && n.parent !== activeParentId); activeParentId = null; calculateProgress(); }
+    function autoSave() { const key = `${currentDate}_SINGLE_TREE`; ledger[key] = JSON.parse(JSON.stringify(workingData)); localStorage.setItem('habitLedger', JSON.stringify(ledger)); }
+    function handleDescriptorClick(e, id) { e.stopPropagation(); if (activeParentId === id) { editingId = id; render(); setTimeout(() => { const el = document.getElementById(`edit-${id}`); if(el) { el.focus(); el.select(); } }, 50); } else { handleNodeClick(id); } }
+    function finalizeEdit(id, val) { recordState(); const node = workingData.find(n => n.id === id); if (node) node.name = val || "[...]"; editingId = null; calculateProgress(); }
+    function updateQuantity(id, val) { recordState(); workingData.find(n => n.id === id).quantity = parseFloat(val) || 0; calculateProgress(); }
+    function toggleCheck(id, checked) { recordState(); const val = checked ? 1 : 0; const node = workingData.find(n => n.id === id); if (node.inactive) return; node.value = val; node.completionTime = checked ? new Date().toISOString() : null; const setR = (pId) => { workingData.filter(n => n.parent === pId).forEach(n => { if(!n.inactive) { n.value = val; n.completionTime = checked ? new Date().toISOString() : null; } setR(n.id); }); }; setR(id); calculateProgress(); }
+    function toggleInactive() { recordState(); if(!activeParentId) return; const n = workingData.find(x=>x.id===activeParentId); const newState = !n.inactive; const cascade = (pId) => { workingData.filter(x => x.parent === pId).forEach(c => { c.inactive = newState; if (!newState) c.value = 0; cascade(c.id); }); }; n.inactive = newState; if (!newState) n.value = 0; cascade(activeParentId); if (!newState) { let curr = workingData.find(p => p.id === n.parent); while (curr) { curr.inactive = false; curr = workingData.find(p => p.id === curr.parent); } } calculateProgress(); }
+    function toggleFilter(type) { if (type === 'hideSlept') { hideSlept = !hideSlept; document.getElementById('filter-sleep-btn').classList.toggle('toggle-active', hideSlept); } else { showActiveOnly = !showActiveOnly; document.getElementById('filter-active-btn').classList.toggle('toggle-active', showActiveOnly); } render(); }
+    function toggleStandalonePanel(id) { const p = document.getElementById(id); const isOpen = p.style.display === 'block'; p.style.display = isOpen ? 'none' : 'block'; if (id === 'nav-panel') { document.getElementById('nav-btn').classList.toggle('toggle-active', !isOpen); renderNavSlider(); } if (id === 'cal-panel') { document.getElementById('date-btn').classList.toggle('toggle-active', !isOpen); renderCalendar(); } }
+    function calculateProgress() { const getScore = (nId, data) => { const n = data.find(h => h.id === nId); if(!n || n.isQuantity || n.inactive) return 0; const active = data.filter(h => h.parent === nId && !h.inactive && !h.isQuantity); if (!active.length) return n.value || 0; n.value = active.reduce((acc, c) => acc + getScore(c.id, data), 0) / active.length; return n.value; }; workingData.filter(h => !h.parent).forEach(r => getScore(r.id, workingData)); render(); autoSave(); }
+    function handleQuantityAdd() { recordState(); const nid = "q-"+Date.now(); workingData.push({ id: nid, parent: activeParentId || focusId, name: "QTY", isQuantity: true, quantity: 0, expanded: false, inactive: false, notes: "", noteVisible: false }); editingId = nid; render(); }
+    function smartAddNode() { recordState(); const nid = "n-"+Date.now(); workingData.push({ id: nid, parent: activeParentId || focusId, name: "NEW", value: 0, expanded: true, inactive: false, notes: "", noteVisible: false, completionTime: null }); editingId = nid; render(); }
+    function navBack() { if (!focusId) return; const node = workingData.find(n => n.id === focusId); focusId = node ? node.parent : null; render(); }
+    function navForward() { if (activeParentId && workingData.some(n => n.parent === activeParentId)) { focusId = activeParentId; render(); } }
+</script>
+</body>
+</html>
